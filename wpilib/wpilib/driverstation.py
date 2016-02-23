@@ -7,6 +7,7 @@
 import threading
 
 import hal
+import inspect
 import sys
 import traceback
 
@@ -159,6 +160,15 @@ class DriverStation:
         if currentTime > self.nextMessageTime:
             self.reportError(message, False)
             self.nextMessageTime = currentTime + JOYSTICK_UNPLUGGED_MESSAGE_INTERVAL
+            
+    def _reportJoystickUnpluggedWarning(self, message):
+        """
+        Reports errors related to unplugged joysticks and throttles them so that they don't overwhelm the DS
+        """
+        currentTime = Timer.getFPGATimestamp()
+        if currentTime > self.nextMessageTime:
+            self.reportWarning(message, False)
+            self.nextMessageTime = currentTime + JOYSTICK_UNPLUGGED_MESSAGE_INTERVAL
 
     def getStickAxis(self, stick, axis):
         """Get the value of the axis on a joystick.
@@ -179,7 +189,7 @@ class DriverStation:
             joystickAxes = self.joystickAxes[stick]
 
             if axis >= len(joystickAxes):
-                self._reportJoystickUnpluggedError("WARNING: Joystick axis %d on port %d not available, check if controller is plugged in\n" % (axis, stick))
+                self._reportJoystickUnpluggedWarning("Joystick axis %d on port %d not available, check if controller is plugged in\n" % (axis, stick))
                 return 0.0
             value = joystickAxes[axis]
         if value < 0:
@@ -218,7 +228,7 @@ class DriverStation:
             joystickPOVs = self.joystickPOVs[stick]
 
             if pov >= len(joystickPOVs):
-                self._reportJoystickUnpluggedError("WARNING: Joystick POV %d on port %d not available, check if controller is plugged in\n" % (pov, stick))
+                self._reportJoystickUnpluggedWarning("Joystick POV %d on port %d not available, check if controller is plugged in\n" % (pov, stick))
                 return -1
             return joystickPOVs[pov]
 
@@ -260,7 +270,7 @@ class DriverStation:
         with self.mutex:
             buttons = self.joystickButtons[stick]
             if button > buttons.count:
-                self._reportJoystickUnpluggedError("WARNING: Joystick Button %d on port %d not available, check if controller is plugged in\n" % (button, stick))
+                self._reportJoystickUnpluggedWarning("Joystick Button %d on port %d not available, check if controller is plugged in\n" % (button, stick))
                 return False
             if button <= 0:
                 self._reportJoystickUnpluggedError("ERROR: Button indexes begin at 1 for WPILib\n")
@@ -294,7 +304,7 @@ class DriverStation:
         with self.mutex:
             # TODO: Remove this when calling for descriptor on empty stick no longer crashes.
             if 1 > self.joystickButtons[stick].count and 1 > len(self.joystickAxes[stick]):
-                self._reportJoystickUnpluggedError("WARNING: Joystick on port {} not avaliable, check if controller is "
+                self._reportJoystickUnpluggedWarning("Joystick on port {} not avaliable, check if controller is "
                                                    "plugged in.\n".format(stick))
                 return False
     
@@ -314,7 +324,7 @@ class DriverStation:
         with self.mutex:
             # TODO: Remove this when calling for descriptor on empty stick no longer crashes.
             if 1 > self.joystickButtons[stick].count and 1 > len(self.joystickAxes[stick]):
-                self._reportJoystickUnpluggedError("WARNING: Joystick on port {} not avaliable, check if controller is "
+                self._reportJoystickUnpluggedWarning("Joystick on port {} not avaliable, check if controller is "
                                                    "plugged in.\n".format(stick))
                 return False
     
@@ -334,7 +344,7 @@ class DriverStation:
         with self.mutex:
             # TODO: Remove this when calling for descriptor on empty stick no longer crashes.
             if 1 > self.joystickButtons[stick].count and 1 > len(self.joystickAxes[stick]):
-                self._reportJoystickUnpluggedError("WARNING: Joystick on port {} not avaliable, check if controller is "
+                self._reportJoystickUnpluggedWarning("Joystick on port {} not avaliable, check if controller is "
                                                    "plugged in.\n".format(stick))
                 return False
 
@@ -490,8 +500,23 @@ class DriverStation:
         """Report error to Driver Station, and also prints error to `sys.stderr`.
         Optionally appends stack trace to error message.
 
+        :param error: Error message
+        :type error: str
         :param printTrace: If True, append stack trace to error string
         """
+        DriverStation._reportErrorImpl(True, 1, error, printTrace)
+        
+    @staticmethod
+    def reportWarning(error, printTrace):
+        """Report warning to Driver Station, and also prints error to `sys.stderr`.
+        Optionally appends stack trace to error message.
+
+        :param printTrace: If True, append stack trace to error string
+        """
+        DriverStation._reportErrorImpl(False, 1, error, printTrace)
+    
+    @staticmethod
+    def _reportErrorImpl(isError, code, error, printTrace):
         errorString = error
         if printTrace:
             exc = sys.exc_info()[0]
@@ -508,11 +533,10 @@ class DriverStation:
             
             logger.exception(error)
         else:
+            _, filename, linenumber, _, _, _ = inspect.stack()[2]
             logger.error(errorString)
         
-        controlWord = hal.HALGetControlWord()
-        if controlWord.dsAttached != 0:
-            hal.HALSetErrorData(errorString, 0)
+        hal.HALSendError(isError, code, False, error, locString, traceString if printTrace else "", True)
             
 
     def InDisabled(self, entering):

@@ -217,6 +217,9 @@ def HALSetErrorData(errors, errorsLength, wait_ms):
     # and it logs by default now
     #logger.warn(errors.decode('utf-8').strip())
     hal_data['error_data'] = errors
+    
+def HALSendError(isError, errorCode, isLvCode, details, location, callStack, printMsg):
+    hal_data['error_data'] = (isError, errorCode, isLvCode, details, location, callStack, printMsg)
 
 def HALGetControlWord():
     return types.HALControlWord(hal_data['control'])

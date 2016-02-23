@@ -101,6 +101,14 @@ def HALSetErrorData(errors, wait_ms):
     errors = errors.encode('utf-8')
     return _HALSetErrorData(errors, len(errors), wait_ms)
 
+_HALSendError = _RETFUNC("HALSendError", C.c_int, ("isError", C.c_int), ("errorCode", C.c_int32), ("isLvCode", C.c_int), ("details", C.c_char_p), ("location", C.c_char_p), ("callStack", C.c_char_p), ("printMsg", C.c_int))
+@hal_wrapper
+def HALSendError(isError, errorCode, isLvCode, details, location, callStack, printMsg):
+    details = details.encode('utf-8')
+    location = location.encode('utf-8')
+    callStack = callStack.encode('utf-8')
+    return _HALSendError(isError, errorCode, isLvCode, details, location, callStack, printMsg)
+
 HALGetControlWord = _RETFUNC("HALGetControlWord", C.c_int, ("data", HALControlWord_ptr), out=["data"])
 
 HALGetAllianceStation = _RETFUNC("HALGetAllianceStation", C.c_int, ("allianceStation", C.POINTER(C.c_int)), out=["allianceStation"])

@@ -26,6 +26,11 @@ FuncData = collections.namedtuple(
 
 
 def gen_check(pname, ptype):
+    SIGNED_CHECK = "isinstance({0}, int) and -1<<{1} <= {0} < 1<<{1}".format
+    UNSIGNED_CHECK = "isinstance({0}, int) and 0 <= {0} < 1<<{1}".format
+
+    SIGNED_TYPES = {C.c_byte, C.c_int8, C.c_int16, C.c_int32, C.c_int64}
+    UNSIGNED_TYPES = {C.c_uint8, C.c_uint16, C.c_uint32, C.c_uint64}
 
     # TODO: This does checks on normal types, but if you pass a ctypes value
     #       in then this does not check those properly.
@@ -33,7 +38,7 @@ def gen_check(pname, ptype):
     if ptype is C.c_bool:
         return "isinstance(%s, bool)" % pname
 
-    elif ptype in [C.c_float, C.c_double, C.c_longdouble]:
+    elif ptype in (C.c_float, C.c_double, C.c_longdouble):
         return "isinstance(%s, (int, float))" % pname
 
     elif ptype is C.c_char:
@@ -48,71 +53,15 @@ def gen_check(pname, ptype):
     elif ptype is C.c_wchar_p:
         return "%s is None or isinstance(%s, bytes)" % (pname, pname)
 
-    elif ptype in [C.c_int, C.c_long, C.c_longlong]:
+    elif ptype in (C.c_int, C.c_long, C.c_longlong):
         return "isinstance(%s, int)" % pname
-    elif ptype in [C.c_byte, C.c_int8]:
-        return "isinstance(%s, int) and %s < %d and %s > -%d" % (
-            pname,
-            pname,
-            1 << 7,
-            pname,
-            1 << 7,
-        )
-    elif ptype is C.c_int16:
-        return "isinstance(%s, int) and %s < %d and %s > -%d" % (
-            pname,
-            pname,
-            1 << 15,
-            pname,
-            1 << 15,
-        )
-    elif ptype is C.c_int32:
-        return "isinstance(%s, int) and %s < %d and %s > -%d" % (
-            pname,
-            pname,
-            1 << 31,
-            pname,
-            1 << 31,
-        )
-    elif ptype is C.c_int64:
-        return "isinstance(%s, int) and %s < %d and %s > -%d" % (
-            pname,
-            pname,
-            1 << 63,
-            pname,
-            1 << 63,
-        )
+    elif ptype in SIGNED_TYPES:
+        return SIGNED_CHECK(pname, C.sizeof(ptype) * 8 - 1)
 
-    elif ptype in [C.c_uint, C.c_size_t]:
+    elif ptype in (C.c_uint, C.c_size_t):
         return "isinstance(%s, int)" % (pname)
-    elif ptype is C.c_uint8:
-        return "isinstance(%s, int) and %s < %d and %s >= 0" % (
-            pname,
-            pname,
-            1 << 8,
-            pname,
-        )
-    elif ptype is C.c_uint16:
-        return "isinstance(%s, int) and %s < %d and %s >= 0" % (
-            pname,
-            pname,
-            1 << 16,
-            pname,
-        )
-    elif ptype is C.c_uint32:
-        return "isinstance(%s, int) and %s < %d and %s >= 0" % (
-            pname,
-            pname,
-            1 << 32,
-            pname,
-        )
-    elif ptype is C.c_uint64:
-        return "isinstance(%s, int) and %s < %d and %s >= 0" % (
-            pname,
-            pname,
-            1 << 64,
-            pname,
-        )
+    elif ptype in UNSIGNED_TYPES:
+        return UNSIGNED_CHECK(pname, C.sizeof(ptype) * 8)
 
     elif ptype is None:
         return "%s is None" % pname

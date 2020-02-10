@@ -2,7 +2,7 @@
 
 classes:
   SendableBuilderImpl:
-    shared_ptr: true
+    shared_ptr: false
     methods:
       SendableBuilderImpl:
       SetTable:

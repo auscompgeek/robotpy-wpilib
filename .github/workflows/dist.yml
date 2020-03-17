@@ -17,7 +17,29 @@ jobs:
         python -m pip install black
         black --check --diff  .
 
+  sdist:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-python@v1
+      with:
+        python-version: 3.8
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install "robotpy-build>=2020.1.10"
+
+    - name: Build sdist
+      run: python setup.py sdist
+
+    - uses: actions/upload-artifact@v1
+      with:
+        name: sdist
+        path: dist
+
   build:
+    needs: [sdist]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -31,19 +53,18 @@ jobs:
           architecture: x86
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/download-artifact@v1
+      with:
+        name: sdist
+        path: sdist/
     - uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python_version }}
         architecture: ${{ matrix.architecture }}
 
-    - name: Install build dependencies
-      run: |
-        python -m pip install 'robotpy-build>=2020.1.10'
-        python -m robotpy_build build-dep --install --find-links https://www.tortall.net/~robotpy/wheels/2020/linux_x86_64
-
     - name: Build wheel
-      run: python setup.py bdist_wheel
+      shell: bash
+      run: pip wheel --no-deps -v -w dist sdist/*
       env:
         RPYBUILD_PARALLEL: 1
         RPYBUILD_STRIP_LIBPYTHON: 1
@@ -51,9 +72,9 @@ jobs:
     - name: Test wheel
       shell: bash
       run: |
-        cd dist
-        python -m pip install *.whl
-        cd ../tests
+        python -m pip install dist/*.whl
+        tar xf sdist/*
+        cd */tests
         python -m pip install -r requirements.txt
         python run_tests.py
     
@@ -107,8 +128,6 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
 
     steps:
-    - uses: actions/checkout@v1
-
     - uses: actions/download-artifact@v1
       with:
         name: dist-py3.6-windows-latest-x86
@@ -154,15 +173,14 @@ jobs:
         name: dist-py3.8-macos-latest-x64
         path: dist/
 
+    - uses: actions/download-artifact@v1
+      with:
+        name: sdist
+        path: dist/
+
     - uses: actions/setup-python@v1
       with:
         python-version: 3.8
-
-    - name: Install build dependencies
-      run: python -m pip install 'robotpy-build>=2020.1.10'
-
-    - name: Build sdist
-      run: python setup.py sdist
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@master
